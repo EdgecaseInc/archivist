@@ -63,13 +63,21 @@ func runMapper() {
 
 	for {
 		line, err := in.ReadString('\n')
+		check(err)
 		increment("wc_mapper", "lines")
+		words := strings.Split(line, "|")
 
-		words := strings.Split(strings.TrimRight(line, "\n"), " ")
+		delimCount := uint(strings.Count(line, "|"))
+		if delimCount < *expectedDelims {
+			increment("wc_mapper", "trimmed")
+			line2, err := in.ReadString('\n')
+			words := append(words, strings.split(line2, "|"))
+			line3, err := in.ReadString('\n')
+			words := append(words, strings.split(line3, "|"))
+		}
 
 		for _, word := range words {
 
-			fmt.Printf("%s\n", strings.ToLower(word))
 		}
 
 		if err == io.EOF {
@@ -146,7 +154,7 @@ func check(e error) {
 }
 
 func increment(group string, counter string) {
-	fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
+	//fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
 }
 
 /*
