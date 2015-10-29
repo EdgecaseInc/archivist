@@ -60,6 +60,7 @@ func main() {
 
 func runMapper() {
 	in := bufio.NewReader(os.Stdin)
+	trimmed := 0
 
 	for {
 		line, err := in.ReadString('\n')
@@ -81,7 +82,9 @@ func runMapper() {
 
 		} else if delimCount < *expectedDelims {
 			increment("wc_mapper", "trimmed")
+			trimmed++
 
+			fmt.Fprintf(os.Stderr, "trimmed:%s\n", line)
 			line2, err := in.ReadString('\n')
 			check(err)
 			words2 := strings.Split(line2, "|")
@@ -89,6 +92,7 @@ func runMapper() {
 				words = append(words, word2)
 			}
 
+			fmt.Fprintf(os.Stderr, "trimmed:%s\n", line2)
 			line3, err := in.ReadString('\n')
 			check(err)
 			words3 := strings.Split(line3, "|")
@@ -97,11 +101,13 @@ func runMapper() {
 				fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 			}
 
+			fmt.Fprintf(os.Stderr, "trimmed:%s\n", line3)
 		} else {
 			increment("wc_mapper", "correct")
 			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 		}
 	}
+	fmt.Fprintf(os.Stderr, "trimmed; %d\n", trimmed)
 }
 
 func writeFixedLine(words []string) string {
@@ -132,7 +138,7 @@ func check(e error) {
 }
 
 func increment(group string, counter string) {
-	fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
+	//fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
 }
 
 /*
