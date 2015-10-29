@@ -68,11 +68,20 @@ func runMapper() {
 		words := strings.Split(line, "|")
 
 		delimCount := uint(strings.Count(line, "|"))
-		if delimCount < *expectedDelims {
+
+		fmt.Fprintf(os.Stderr, "delims: %d\n", delimCount)
+
+		if delimCount > *expectedDelims {
+			increment("wc_mapper", "bad")
+			// write the bad row to the specifed bad file
+
+		} else if delimCount < *expectedDelims {
+			fmt.Fprintf(os.Stderr, "fixing: %s\n", line)
 			increment("wc_mapper", "trimmed")
 
 			line2, err := in.ReadString('\n')
 			check(err)
+			fmt.Fprintf(os.Stderr, "fixing: %s\n", line2)
 			words2 := strings.Split(line2, "|")
 			for _, word2 := range words2 {
 				words = append(words, word2)
@@ -80,15 +89,16 @@ func runMapper() {
 
 			line3, err := in.ReadString('\n')
 			check(err)
+			fmt.Fprintf(os.Stderr, "fixing: %s\n", line3)
 			words3 := strings.Split(line3, "|")
 			for _, word3 := range words3 {
 				words = append(words, word3)
+				fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 			}
-		}
 
-		for _, word := range words {
-			fmt.Fprintf(os.Stderr, "%s\n", word)
-
+		} else {
+			increment("wc_mapper", "correct")
+			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 		}
 
 		if err == io.EOF {
@@ -97,6 +107,23 @@ func runMapper() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func writeFixedLine(words []string) string {
+	var buf bytes.Buffer
+
+	for _, word := range words {
+		trimmedWord := strings.TrimSpace(word)
+
+		buf.WriteString(trimmedWord)
+
+		if !strings.Contains(word, "\n") {
+			buf.WriteString("\\|")
+		} else {
+			buf.WriteString("\n")
+		}
+	}
+	return buf.String()
 }
 
 func runReducer() {
