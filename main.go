@@ -70,13 +70,24 @@ func runMapper() {
 		delimCount := uint(strings.Count(line, "|"))
 		if delimCount < *expectedDelims {
 			increment("wc_mapper", "trimmed")
+
 			line2, err := in.ReadString('\n')
-			words := append(words, strings.split(line2, "|"))
+			check(err)
+			words2 := strings.Split(line2, "|")
+			for _, word2 := range words2 {
+				words = append(words, word2)
+			}
+
 			line3, err := in.ReadString('\n')
-			words := append(words, strings.split(line3, "|"))
+			check(err)
+			words3 := strings.Split(line3, "|")
+			for _, word3 := range words3 {
+				words = append(words, word3)
+			}
 		}
 
 		for _, word := range words {
+			fmt.Fprintf(os.Stderr, "%s\n", word)
 
 		}
 
