@@ -63,7 +63,6 @@ func runMapper() {
 
 	for {
 		line, err := in.ReadString('\n')
-
 		increment("wc_mapper", "lines")
 
 		words := strings.Split(strings.TrimRight(line, "\n"), " ")
@@ -146,6 +145,12 @@ func check(e error) {
 	}
 }
 
+func increment(group string, counter string) {
+	fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
+}
+
+/*
+
 func countLines(r io.Reader) (int, error) {
 	// play with this buffer size to optimize for speed
 	buf := make([]byte, *bufferSize)
@@ -168,11 +173,6 @@ func countLines(r io.Reader) (int, error) {
 	return lineCount, nil
 }
 
-func increment(group string, counter string) {
-	fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
-}
-
-/*
 func awsStuff() {
 	// get array of all object names - use objects.Contents
 	objects, _ := getObjectsInBucket()
