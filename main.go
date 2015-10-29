@@ -8,18 +8,21 @@ import (
 	"io"
 	"log"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/defaults"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"launchpad.net/gommap"
+	//"github.com/aws/aws-sdk-go/aws"
+	//"github.com/aws/aws-sdk-go/aws/defaults"
+	//"github.com/aws/aws-sdk-go/service/s3"
+	//"launchpad.net/gommap"
 )
 
+var runStage = flag.String("stage", "", "specify the stage to run.  Can be 'mapper' or 'reducer'")
 var expectedDelims = flag.Uint("numDelims", 0, "specify the number of times the delimiter is expected to appear in each line")
 var bufferSize = flag.Uint("bufferSize", 8196, "specify the buffer size to use why scanning through files")
+var badFile = flag.String("badFile", "", "specify the file where bad rows should be written")
+
+/*
 var srcBucket = flag.String("srcBucket", "", "specify the full path the bucket that contains the files needing fixing")
 var destBucket = flag.String("destBucket", "", "specify a full path to the bucket where the results will be stored")
 var badBucket = flag.String("badBucket", "", "specify a full path to the bucket where the unfixable bad results will be stored")
@@ -33,114 +36,53 @@ func checkFlags() {
 		return
 	}
 }
+*/
 
 func main() {
 	// validate & parse the flags sent into the command
-	checkFlags()
+	//checkFlags()
 
-	// get array of all object names - use objects.Contents
-	objects, _ := getObjectsInBucket()
-	// loop a goroutine for each file to:
-	svc := s3.New(nil)
-	result, err := svc.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(*srcBucket),
-		Key:    aws.String(*objects.Contents[0].Key),
-	})
-	if err != nil {
-		log.Fatal("Failed to get object", err)
+	flag.Parse()
+	if *expectedDelims == 0 || *runStage == "" || *badFile == "" {
+		flag.PrintDefaults()
+		return
 	}
-	file, err := os.Create("./data/test.txt")
-	if err != nil {
-		log.Fatal("Failed to create file", err)
+
+	switch *runStage {
+	case "mapper":
+		runMapper()
+	case "reducer":
+		runReducer()
+	default:
+		log.Fatalln("stage must be either 'mapper' or 'reducer'")
 	}
-	if _, err := io.Copy(file, result.Body); err != nil {
-		log.Fatal("Failed to copy object to file", err)
-	}
-	result.Body.Close()
-	file.Close()
-	//// -stream object to a mmapped file
-	//// -fix the lines
-	//// -upload bad rows to separate files
-	//// -reupload to s3
-	// when all are done
 }
 
-func getObjectsInBucket() (*s3.ListObjectsOutput, error) {
-	defaults.DefaultConfig.Region = aws.String("us-west-2")
+func runMapper() {
+	in := bufio.NewReader(os.Stdin)
 
-	svc := s3.New(nil)
+	for {
+		line, err := in.ReadString('\n')
 
-	params := &s3.ListObjectsInput{
-		Bucket: aws.String(*srcBucket), // Required
-		Prefix: aws.String(*objPrefix),
+		increment("wc_mapper", "lines")
+
+		words := strings.Split(strings.TrimRight(line, "\n"), " ")
+
+		for _, word := range words {
+
+			fmt.Printf("%s\n", strings.ToLower(word))
+		}
+
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
 	}
-	resp, err := svc.ListObjects(params)
-
-	if err != nil {
-		// Print the error, cast err to awserr.Error to get the Code and
-		// Message from an error.
-		fmt.Println(err.Error())
-		return resp, err
-	}
-
-	// Pretty-print the response data.
-	fmt.Println(reflect.TypeOf(resp))
-	return resp, nil
 }
 
-func fixFile() {
-	file, err := os.Open("./data/0000.txt")
-	check(err)
-
-	mmap, err := gommap.Map(file.Fd(), gommap.PROT_READ, gommap.MAP_PRIVATE)
-	check(err)
-
-	numLines, err := countLines(bytes.NewReader(mmap))
-	check(err)
-
-	lines := bytes.SplitN(mmap, []byte{'\n'}, numLines)
-
-	lines[numLines-1] = bytes.Trim(lines[numLines-1], "\n")
-
-	// dear lord, fix this
-	sub := [][][]byte{
-		lines[:(numLines / 4)],
-		lines[(numLines / 4):(numLines / 2)],
-		lines[(numLines / 2) : (numLines/2)+(numLines/4)],
-		lines[(numLines/2)+(numLines/4) : numLines],
-	}
-
-	jobs := make(chan []byte)
-	results := make(chan string)
-
-	wg := new(sync.WaitGroup)
-	for w := 0; w <= 3; w++ {
-		wg.Add(1)
-		go normalizeLines(jobs, results, wg)
-	}
-
-	go func() {
-		for i := 0; i <= 3; i++ {
-			jobs <- bytes.Join(sub[i], []byte{'\n'})
-		}
-		close(jobs)
-	}()
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	for v := range results {
-		if strings.HasPrefix(v, "trimmed:") {
-			//fmt.Fprintf(os.Stdout, "%s\n", v[strings.IndexAny(v, ":")+1:])
-		} else if strings.HasPrefix(v, "bad:") {
-			fmt.Fprintf(os.Stdout, "%s\n", v[strings.IndexAny(v, ":")+1:])
-		} else {
-			//fmt.Fprintf(os.Stdout, "%s\n", v)
-		}
-	}
-
+func runReducer() {
+	// This should do nothing
 }
 
 func normalizeLines(jobs <-chan []byte, results chan<- string, wg *sync.WaitGroup) {
@@ -225,3 +167,109 @@ func countLines(r io.Reader) (int, error) {
 
 	return lineCount, nil
 }
+
+func increment(group string, counter string) {
+	fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
+}
+
+/*
+func awsStuff() {
+	// get array of all object names - use objects.Contents
+	objects, _ := getObjectsInBucket()
+	// loop a goroutine for each file to:
+	svc := s3.New(nil)
+	result, err := svc.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(*srcBucket),
+		Key:    aws.String(*objects.Contents[0].Key),
+	})
+	check(err)
+
+	file, err := os.Create("./data/test.txt")
+	check(err)
+
+	if _, err := io.Copy(file, result.Body); err != nil {
+		log.Fatal("Failed to copy object to file", err)
+	}
+	result.Body.Close()
+	file.Close()
+	//// -stream object to a mmapped file
+	//// -fix the lines
+	//// -upload bad rows to separate files
+	//// -reupload to s3
+	// when all are done
+}
+
+func getObjectsInBucket() (*s3.ListObjectsOutput, error) {
+	defaults.DefaultConfig.Region = aws.String("us-west-2")
+
+	svc := s3.New(nil)
+
+	params := &s3.ListObjectsInput{
+		Bucket: aws.String(*srcBucket), // Required
+		Prefix: aws.String(*objPrefix),
+	}
+	resp, err := svc.ListObjects(params)
+	check(err)
+
+	// Pretty-print the response data.
+	return resp, nil
+}
+
+func fancyStuff() {
+	file, err := os.Open(os.Stdin)
+	check(err)
+
+	mmap, err := gommap.Map(file.Fd(), gommap.PROT_READ, gommap.MAP_PRIVATE)
+	check(err)
+
+	numLines, err := countLines(bytes.NewReader(mmap))
+	check(err)
+
+	lines := bytes.SplitN(mmap, []byte{'\n'}, numLines)
+
+	lines[numLines-1] = bytes.Trim(lines[numLines-1], "\n")
+
+	// dear lord, fix this
+	sub := [][][]byte{
+		lines[:(numLines / 4)],
+		lines[(numLines / 4):(numLines / 2)],
+		lines[(numLines / 2) : (numLines/2)+(numLines/4)],
+		lines[(numLines/2)+(numLines/4) : numLines],
+	}
+
+	jobs := make(chan []byte)
+	results := make(chan string)
+
+	wg := new(sync.WaitGroup)
+	for w := 0; w <= 3; w++ {
+		wg.Add(1)
+		go normalizeLines(jobs, results, wg)
+	}
+
+	go func() {
+		for i := 0; i <= 3; i++ {
+			jobs <- bytes.Join(sub[i], []byte{'\n'})
+		}
+		close(jobs)
+	}()
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for v := range results {
+		if strings.HasPrefix(v, "trimmed:") {
+			increment("wc_mapper", "trimmed")
+			fmt.Fprintf(os.Stdout, "%s\n", v[strings.IndexAny(v, ":")+1:])
+		} else if strings.HasPrefix(v, "bad:") {
+			increment("wc_mapper", "bad")
+			//fmt.Fprintf(os.Stderr, "%s\n", v[strings.IndexAny(v, ":")+1:])
+			//write to the bad file
+		} else {
+			increment("wc_mapper", "lines")
+			fmt.Fprintf(os.Stdout, "%s\n", v)
+		}
+	}
+}
+*/
