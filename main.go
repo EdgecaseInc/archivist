@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 	"strings"
-	"sync"
+	//"sync"
 
 	//"github.com/aws/aws-sdk-go/aws"
 	//"github.com/aws/aws-sdk-go/aws/defaults"
@@ -63,25 +63,27 @@ func runMapper() {
 
 	for {
 		line, err := in.ReadString('\n')
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			log.Fatal(err)
+		}
 		check(err)
+
 		increment("wc_mapper", "lines")
 		words := strings.Split(line, "|")
 
 		delimCount := uint(strings.Count(line, "|"))
-
-		fmt.Fprintf(os.Stderr, "delims: %d\n", delimCount)
 
 		if delimCount > *expectedDelims {
 			increment("wc_mapper", "bad")
 			// write the bad row to the specifed bad file
 
 		} else if delimCount < *expectedDelims {
-			fmt.Fprintf(os.Stderr, "fixing: %s\n", line)
 			increment("wc_mapper", "trimmed")
 
 			line2, err := in.ReadString('\n')
 			check(err)
-			fmt.Fprintf(os.Stderr, "fixing: %s\n", line2)
 			words2 := strings.Split(line2, "|")
 			for _, word2 := range words2 {
 				words = append(words, word2)
@@ -89,7 +91,6 @@ func runMapper() {
 
 			line3, err := in.ReadString('\n')
 			check(err)
-			fmt.Fprintf(os.Stderr, "fixing: %s\n", line3)
 			words3 := strings.Split(line3, "|")
 			for _, word3 := range words3 {
 				words = append(words, word3)
@@ -99,12 +100,6 @@ func runMapper() {
 		} else {
 			increment("wc_mapper", "correct")
 			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
-		}
-
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			log.Fatal(err)
 		}
 	}
 }
@@ -129,6 +124,18 @@ func writeFixedLine(words []string) string {
 func runReducer() {
 	// This should do nothing
 }
+
+func check(e error) {
+	if e != nil {
+		log.Fatal(e)
+	}
+}
+
+func increment(group string, counter string) {
+	fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
+}
+
+/*
 
 func normalizeLines(jobs <-chan []byte, results chan<- string, wg *sync.WaitGroup) {
 	//defer wg.Done()
@@ -185,17 +192,6 @@ func normalizeLines(jobs <-chan []byte, results chan<- string, wg *sync.WaitGrou
 	wg.Done()
 }
 
-func check(e error) {
-	if e != nil {
-		log.Fatal(e)
-	}
-}
-
-func increment(group string, counter string) {
-	//fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
-}
-
-/*
 
 func countLines(r io.Reader) (int, error) {
 	// play with this buffer size to optimize for speed
