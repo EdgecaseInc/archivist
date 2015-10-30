@@ -60,7 +60,6 @@ func main() {
 
 func runMapper() {
 	in := bufio.NewReader(os.Stdin)
-	trimmed := 0
 
 	for {
 		line, err := in.ReadString('\n')
@@ -77,48 +76,43 @@ func runMapper() {
 		delimCount := uint(strings.Count(line, "|"))
 
 		if delimCount > *expectedDelims {
-			increment("wc_mapper", "bad")
+			increment("wc_mapper", "too_many_delims")
 			// write the bad row to the specifed bad file
 
 		} else if delimCount < *expectedDelims {
-			increment("wc_mapper", "trimmed")
-			trimmed++
+			increment("wc_mapper", "split_line")
 
-			fmt.Fprintf(os.Stderr, "trimmed:%s\n", line)
-			line2, err := in.ReadString('\n')
-			check(err)
-			words2 := strings.Split(line2, "|")
-			for _, word2 := range words2 {
-				words = append(words, word2)
+			next, _ := in.ReadString('\n')
+			nextWords := strings.Split(next, "|")
+
+			for _, word := range nextWords {
+				words = append(words, word)
 			}
 
-			fmt.Fprintf(os.Stderr, "trimmed:%s\n", line2)
-			line3, err := in.ReadString('\n')
-			check(err)
-			words3 := strings.Split(line3, "|")
-			for _, word3 := range words3 {
-				words = append(words, word3)
-				fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
+			last, _ := in.ReadString('\n')
+			lastWords := strings.Split(last, "|")
+
+			for _, word := range lastWords {
+				words = append(words, word)
 			}
 
-			fmt.Fprintf(os.Stderr, "trimmed:%s\n", line3)
+			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 		} else {
 			increment("wc_mapper", "correct")
 			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 		}
 	}
-	fmt.Fprintf(os.Stderr, "trimmed; %d\n", trimmed)
 }
 
 func writeFixedLine(words []string) string {
 	var buf bytes.Buffer
 
-	for _, word := range words {
+	for i, word := range words {
 		trimmedWord := strings.TrimSpace(word)
 
 		buf.WriteString(trimmedWord)
 
-		if !strings.Contains(word, "\n") {
+		if i < len(words)-1 {
 			buf.WriteString("\\|")
 		} else {
 			buf.WriteString("\n")
@@ -138,7 +132,7 @@ func check(e error) {
 }
 
 func increment(group string, counter string) {
-	//fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
+	fmt.Fprintf(os.Stderr, "reporter:counter:%s,%s,1\n", group, counter)
 }
 
 /*
