@@ -13,7 +13,6 @@ import (
 
 var runStage = flag.String("stage", "", "specify the stage to run.  Can be 'mapper' or 'reducer'")
 var expectedDelims = flag.Uint("numDelims", 0, "specify the number of times the delimiter is expected to appear in each line")
-var badFile = flag.String("badFile", "", "specify the file where bad rows should be written")
 
 type reader struct {
 	*bufio.Reader // 'reader' inherits all bufio.Reader methods
@@ -52,7 +51,7 @@ func (r *reader) PeekLines(num int) (string, error) {
 func main() {
 	// validate & parse the flags sent into the command
 	flag.Parse()
-	if *expectedDelims == 0 || *runStage == "" || *badFile == "" {
+	if *expectedDelims == 0 || *runStage == "" {
 		flag.PrintDefaults()
 		return
 	}
@@ -68,10 +67,6 @@ func main() {
 }
 
 func runMapper() {
-	trimmed := 0
-	bad := 0
-	correct := 0
-	lines := 0
 	in := reader{bufio.NewReader(os.Stdin)}
 
 	for {
@@ -84,19 +79,16 @@ func runMapper() {
 		check(err)
 
 		increment("wc_mapper", "lines")
-		lines++
 		words := strings.Split(line, "|")
 
 		delimCount := uint(strings.Count(line, "|"))
 
 		if delimCount > *expectedDelims {
 			increment("wc_mapper", "too_many_delims")
-			bad++
 			// write the bad row to the specifed bad file
 			fmt.Fprintf(os.Stdout, "bad\t%s", line)
 		} else if delimCount < *expectedDelims {
 			increment("wc_mapper", "split_line")
-			trimmed++
 
 			count := delimCount
 			numLines := 1
@@ -119,12 +111,9 @@ func runMapper() {
 			fmt.Fprintf(os.Stdout, "split\t%s", writeFixedLine(words))
 		} else {
 			increment("wc_mapper", "correct")
-			correct++
 			fmt.Fprintf(os.Stdout, "good\t%s", writeFixedLine(words))
 		}
 	}
-
-	fmt.Fprintf(os.Stderr, "Summary:\n\tLines Processed:\t%d\n\tCorrect Rows:\t\t%d\n\tSplit Rows:\t\t%d\n\tBad Rows:\t\t%d\n", lines, correct, trimmed, bad)
 }
 
 func writeFixedLine(words []string) string {
