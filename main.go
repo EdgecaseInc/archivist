@@ -40,7 +40,6 @@ func (r *reader) PeekLines(num int) (string, error) {
 
 	for ; strings.Count(string(peeked), "\n") < num; bufferSize++ {
 		peeked, _ = r.Peek(bufferSize)
-		fmt.Fprintf(os.Stderr, "%d, %s\n", strings.Count(string(peeked), "\n"), peeked)
 	}
 	line, err := r.Peek(bufferSize - 1)
 	if err != nil {
@@ -93,26 +92,21 @@ func runMapper() {
 			increment("wc_mapper", "split_line")
 
 			count := delimCount
+			numLines := 1
 
-			for i := 1; count < *expectedDelims; i++ {
-				peeked, err := in.PeekLines(i)
+			for ; count < *expectedDelims; numLines++ {
+				peeked, err := in.PeekLines(numLines)
 				check(err)
 				count += uint(strings.Count(peeked, "|"))
-				fmt.Fprintf(os.Stderr, "%s\n", peeked)
 			}
 
-			next, _ := in.ReadString('\n')
-			nextWords := strings.Split(next, "|")
+			for i := 0; i < numLines-1; i++ {
+				next, _ := in.ReadString('\n')
+				nextWords := strings.Split(next, "|")
 
-			for _, word := range nextWords {
-				words = append(words, word)
-			}
-
-			last, _ := in.ReadString('\n')
-			lastWords := strings.Split(last, "|")
-
-			for _, word := range lastWords {
-				words = append(words, word)
+				for _, word := range nextWords {
+					words = append(words, word)
+				}
 			}
 
 			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
