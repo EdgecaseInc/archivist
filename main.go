@@ -68,6 +68,10 @@ func main() {
 }
 
 func runMapper() {
+	trimmed := 0
+	bad := 0
+	correct := 0
+	lines := 0
 	in := reader{bufio.NewReader(os.Stdin)}
 
 	for {
@@ -80,16 +84,19 @@ func runMapper() {
 		check(err)
 
 		increment("wc_mapper", "lines")
+		lines++
 		words := strings.Split(line, "|")
 
 		delimCount := uint(strings.Count(line, "|"))
 
 		if delimCount > *expectedDelims {
 			increment("wc_mapper", "too_many_delims")
+			bad++
 			// write the bad row to the specifed bad file
 
 		} else if delimCount < *expectedDelims {
 			increment("wc_mapper", "split_line")
+			trimmed++
 
 			count := delimCount
 			numLines := 1
@@ -112,25 +119,12 @@ func runMapper() {
 			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 		} else {
 			increment("wc_mapper", "correct")
+			correct++
 			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 		}
 	}
-}
 
-func unsplitLines(words []string, in bufio.Reader) (uint, error) {
-	next, err := in.ReadString('\n')
-	if err != nil {
-		return 0, err
-	}
-
-	delims := uint(strings.Count(next, "|"))
-
-	nextWords := strings.Split(next, "|")
-
-	for _, word := range nextWords {
-		words = append(words, word)
-	}
-	return delims, nil
+	fmt.Fprintf(os.Stderr, "Summary:\n\tLines Processed:\t%d\n\tCorrect Rows:\t\t%d\n\tSplit Rows:\t\t%d\n\tBad Rows:\t\t%d\n", lines, correct, trimmed, bad)
 }
 
 func writeFixedLine(words []string) string {
