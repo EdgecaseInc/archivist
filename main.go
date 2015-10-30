@@ -13,8 +13,42 @@ import (
 
 var runStage = flag.String("stage", "", "specify the stage to run.  Can be 'mapper' or 'reducer'")
 var expectedDelims = flag.Uint("numDelims", 0, "specify the number of times the delimiter is expected to appear in each line")
-var bufferSize = flag.Uint("bufferSize", 8196, "specify the buffer size to use why scanning through files")
 var badFile = flag.String("badFile", "", "specify the file where bad rows should be written")
+
+type reader struct {
+	*bufio.Reader // 'reader' inherits all bufio.Reader methods
+}
+
+func (r *reader) PeekLine() (string, error) {
+	var peeked []byte
+	bufferSize := 1
+
+	for ; !strings.Contains(string(peeked), "\n"); bufferSize++ {
+		peeked, _ = r.Peek(bufferSize)
+	}
+	line, err := r.Peek(bufferSize)
+	if err != nil {
+		return string(line), err
+	}
+
+	return string(line), nil
+}
+
+func (r *reader) PeekLines(num int) (string, error) {
+	var peeked []byte
+	bufferSize := 1
+
+	for ; strings.Count(string(peeked), "\n") < num; bufferSize++ {
+		peeked, _ = r.Peek(bufferSize)
+		fmt.Fprintf(os.Stderr, "%d, %s\n", strings.Count(string(peeked), "\n"), peeked)
+	}
+	line, err := r.Peek(bufferSize - 1)
+	if err != nil {
+		return string(line), err
+	}
+
+	return string(line), nil
+}
 
 func main() {
 	// validate & parse the flags sent into the command
@@ -35,7 +69,7 @@ func main() {
 }
 
 func runMapper() {
-	in := bufio.NewReader(os.Stdin)
+	in := reader{bufio.NewReader(os.Stdin)}
 
 	for {
 		line, err := in.ReadString('\n')
@@ -58,31 +92,28 @@ func runMapper() {
 		} else if delimCount < *expectedDelims {
 			increment("wc_mapper", "split_line")
 
-			fmt.Fprintf(os.Stderr, "num words: %d\n", len(words))
+			count := delimCount
+
+			for i := 1; count < *expectedDelims; i++ {
+				peeked, err := in.PeekLines(i)
+				check(err)
+				count += uint(strings.Count(peeked, "|"))
+				fmt.Fprintf(os.Stderr, "%s\n", peeked)
+			}
 
 			next, _ := in.ReadString('\n')
 			nextWords := strings.Split(next, "|")
 
 			for _, word := range nextWords {
-				//if !strings.Contains(word, "\n") {
 				words = append(words, word)
-				//}
 			}
-
-			fmt.Fprintf(os.Stderr, "num next words: %d\n", len(nextWords))
-			fmt.Fprintf(os.Stderr, "now num words: %d\n", len(words))
 
 			last, _ := in.ReadString('\n')
 			lastWords := strings.Split(last, "|")
 
 			for _, word := range lastWords {
-				//if !strings.Contains(word, "\n") {
 				words = append(words, word)
-				//}
 			}
-
-			fmt.Fprintf(os.Stderr, "num last words: %d\n", len(lastWords))
-			fmt.Fprintf(os.Stderr, "finally num words: %d\n", len(words))
 
 			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 		} else {
@@ -92,8 +123,20 @@ func runMapper() {
 	}
 }
 
-func unsplitLines(words []string) {
+func unsplitLines(words []string, in bufio.Reader) (uint, error) {
+	next, err := in.ReadString('\n')
+	if err != nil {
+		return 0, err
+	}
 
+	delims := uint(strings.Count(next, "|"))
+
+	nextWords := strings.Split(next, "|")
+
+	for _, word := range nextWords {
+		words = append(words, word)
+	}
+	return delims, nil
 }
 
 func writeFixedLine(words []string) string {
