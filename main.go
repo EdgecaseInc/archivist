@@ -58,19 +58,31 @@ func runMapper() {
 		} else if delimCount < *expectedDelims {
 			increment("wc_mapper", "split_line")
 
+			fmt.Fprintf(os.Stderr, "num words: %d\n", len(words))
+
 			next, _ := in.ReadString('\n')
 			nextWords := strings.Split(next, "|")
 
 			for _, word := range nextWords {
+				//if !strings.Contains(word, "\n") {
 				words = append(words, word)
+				//}
 			}
+
+			fmt.Fprintf(os.Stderr, "num next words: %d\n", len(nextWords))
+			fmt.Fprintf(os.Stderr, "now num words: %d\n", len(words))
 
 			last, _ := in.ReadString('\n')
 			lastWords := strings.Split(last, "|")
 
 			for _, word := range lastWords {
+				//if !strings.Contains(word, "\n") {
 				words = append(words, word)
+				//}
 			}
+
+			fmt.Fprintf(os.Stderr, "num last words: %d\n", len(lastWords))
+			fmt.Fprintf(os.Stderr, "finally num words: %d\n", len(words))
 
 			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 		} else {
@@ -78,6 +90,10 @@ func runMapper() {
 			fmt.Fprintf(os.Stdout, "%s", writeFixedLine(words))
 		}
 	}
+}
+
+func unsplitLines(words []string) {
+
 }
 
 func writeFixedLine(words []string) string {
@@ -89,7 +105,9 @@ func writeFixedLine(words []string) string {
 		buf.WriteString(trimmedWord)
 
 		if i < len(words)-1 {
-			buf.WriteString("\\|")
+			if !strings.Contains(word, "\n") {
+				buf.WriteString("\\|")
+			}
 		} else {
 			buf.WriteString("\n")
 		}
