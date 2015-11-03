@@ -70,7 +70,7 @@ func runMapper() {
 
 	preview, err := in.PeekLines(5)
 	check(err)
-	expectedDelims := uint(strings.Count(preview, "|") / 5)
+	expectedDelims := getModeDelimCount(preview)
 
 	for {
 		line, err := in.ReadString('\n')
@@ -117,6 +117,29 @@ func runMapper() {
 			fmt.Fprintf(os.Stdout, "good\t%s", writeFixedLine(words))
 		}
 	}
+}
+
+func getModeDelimCount(allLines string) uint {
+	m := map[uint]int{}
+	lines := strings.Split(allLines, "\n")
+	for _, line := range lines {
+		delimCount := uint(strings.Count(line, "|"))
+		i, ok := m[delimCount]
+		if !ok {
+			m[delimCount] = 1
+		} else {
+			m[delimCount] = i + 1
+		}
+	}
+	mode := uint(0)
+	occurences := 0
+	for key, val := range m {
+		if val > occurences {
+			mode = key
+			occurences = val
+		}
+	}
+	return mode
 }
 
 func writeFixedLine(words []string) string {
