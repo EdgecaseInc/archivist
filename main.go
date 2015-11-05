@@ -75,8 +75,10 @@ func runMapper() {
 	knownFileNames := map[uint]string{
 		uint(5):  "object_",
 		uint(6):  "apploaded_",
-		uint(14): "header_",
+		uint(15): "header_",
 	}
+
+	lineCount := uint64(0)
 
 	for {
 		line, err := in.ReadString('\n')
@@ -88,6 +90,7 @@ func runMapper() {
 		check(err)
 
 		increment("wc_mapper", "lines")
+		lineCount++
 		words := strings.Split(line, "|")
 
 		delimCount := uint(strings.Count(line, "|"))
@@ -95,7 +98,7 @@ func runMapper() {
 		if delimCount > expectedDelims {
 			increment("wc_mapper", "too_many_delims")
 			// write the bad row to the specifed bad file
-			fmt.Fprintf(os.Stdout, "%sbad\t%s", knownFileNames[expectedDelims], line)
+			fmt.Fprintf(os.Stdout, "%sbad_%d\t%s", knownFileNames[expectedDelims], lineCount/uint64(1000000), line)
 		} else if delimCount < expectedDelims {
 			increment("wc_mapper", "split_line")
 
@@ -117,10 +120,10 @@ func runMapper() {
 				}
 			}
 
-			fmt.Fprintf(os.Stdout, "%ssplit\t%s", knownFileNames[expectedDelims], writeFixedLine(words))
+			fmt.Fprintf(os.Stdout, "%ssplit_%d\t%s", knownFileNames[expectedDelims], lineCount/uint64(1000000), writeFixedLine(words))
 		} else {
 			increment("wc_mapper", "correct")
-			fmt.Fprintf(os.Stdout, "%sgood\t%s", knownFileNames[expectedDelims], writeFixedLine(words))
+			fmt.Fprintf(os.Stdout, "%sgood_%d\t%s", knownFileNames[expectedDelims], lineCount/uint64(1000000), writeFixedLine(words))
 		}
 	}
 }

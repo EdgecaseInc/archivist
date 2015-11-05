@@ -11,10 +11,11 @@ s3c = boto3.client('s3')
 #urbandecay
 
 #keys = ["august_2015/header_0000_part_00","august_2015/object_0000_part_00", "august_2015/reporting/apploaded_0000_part_00", "november/0000_part_00"]
-keys = ["august_2015/reporting/apploaded_0000_part_00", "november/0000_part_00"]
+#keys = ["august_2015/reporting/apploaded_0000_part_00", "november/0000_part_00"]
+keys = ["august_2015/good/part-00054"]
 for key in keys:
   print "opening %s" % key
-  response = s3c.get_object(Bucket="pixelarchive", Key=key, Range='bytes=0-10485760')
+  response = s3c.get_object(Bucket="pixelarchive-repair", Key=key, Range='bytes=0-10485760')
 
   parts = key.split('/')
   last = len(parts) - 1
