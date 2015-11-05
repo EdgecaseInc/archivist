@@ -123,7 +123,7 @@ func runMapper() {
 			fmt.Fprintf(os.Stdout, "%ssplit\t%s", knownFileNames[expectedDelims], writeFixedLine(words))
 		} else {
 			increment("wc_mapper", "correct")
-			fmt.Fprintf(os.Stdout, "%sgood_%d\t%s", knownFileNames[expectedDelims], lineCount/uint64(1000000), writeFixedLine(words))
+			fmt.Fprintf(os.Stdout, "%sgood_%d\t%s", knownFileNames[expectedDelims], lineCount%uint64(20), writeFixedLine(words))
 		}
 	}
 }
