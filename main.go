@@ -161,7 +161,7 @@ func writeFixedLine(words []string) string {
 
 		if i < len(words)-1 {
 			if !strings.Contains(word, "\n") {
-				buf.WriteString("\\|")
+				buf.WriteString("|")
 			}
 		} else {
 			buf.WriteString("\n")
